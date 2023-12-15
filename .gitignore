@@ -165,3 +165,5 @@ data/
 .venv/
 
 todo.txt
+
+artifacts/
