@@ -3,10 +3,11 @@ from typing import Literal, Optional, List, Dict, Any, Tuple
 from sociolla.utils.logger import logging
 from sklearn.model_selection import train_test_split
 from sociolla.utils.utils import get_from_dict_or_env, retreive_base_path
-from pathlib import Path 
+from pathlib import Path
 from pydantic import BaseModel, model_validator
 import os
 from supabase import create_client, Client
+
 
 class DataIngestionConfig(BaseModel):
     base_path: str = retreive_base_path()
@@ -61,9 +62,9 @@ class DataIngestion(BaseModel):
                 values, "supabase_url", "SUPABASE_URL"
             )
         return values
-    
+
     @property
-    def supabase_client(self) -> Client :
+    def supabase_client(self) -> Client:
         return create_client(self.supabase_url, self.supabase_key)
 
     def _read_from_db(self) -> tuple:
@@ -100,13 +101,10 @@ class DataIngestion(BaseModel):
                 return raw_data_path
             else:
                 response = self._read_from_db()
-                
+
                 logging.info("data ingestion completed")
                 return response
-            
-
 
         except Exception as e:
             logging.error(f"Error while ingesting data : {e}")
             raise e
-        
