@@ -6,6 +6,7 @@ from sociolla.utils.utils import get_from_dict_or_env, retreive_base_path
 from pathlib import Path 
 from pydantic import BaseModel, model_validator
 import os
+from supabase import create_client, Client
 
 class DataIngestionConfig(BaseModel):
     base_path: str = retreive_base_path()
@@ -60,11 +61,16 @@ class DataIngestion(BaseModel):
                 values, "supabase_url", "SUPABASE_URL"
             )
         return values
+    
+    @property
+    def supabase_client(self) -> Client :
+        return create_client(self.supabase_url, self.supabase_key)
 
     def _read_from_db(self) -> tuple:
         logging.info("Reading data from database")
-        pass
+        response = self.supabase_client.table(self.table_name).select("*").execute()
 
+        return response
 
     def _read_from_csv(self) -> tuple:
         """read data from csv file and return train and test data
@@ -89,13 +95,18 @@ class DataIngestion(BaseModel):
                     os.path.dirname(self.ingestion_config.raw_data_path), exist_ok=True
                 )
                 raw_data_path = self._read_from_csv()
+                logging.info("data ingestion completed")
+
                 return raw_data_path
             else:
-                df = self._read_from_db()
-
-            logging.info("data ingestion completed")
+                response = self._read_from_db()
+                
+                logging.info("data ingestion completed")
+                return response
+            
 
 
         except Exception as e:
             logging.error(f"Error while ingesting data : {e}")
             raise e
+        
