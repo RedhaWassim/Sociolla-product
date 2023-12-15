@@ -1,14 +1,15 @@
 import pandas as pd
 from typing import Literal, Optional, List, Dict, Any, Tuple
-from src.utils.logger import logging
+from sociolla.utils.logger import logging
 from sklearn.model_selection import train_test_split
-from src.utils.utils import get_from_dict_or_env
+from sociolla.utils.utils import get_from_dict_or_env, retreive_base_path
+from pathlib import Path 
 from pydantic import BaseModel, model_validator
+import os
 
 class DataIngestionConfig(BaseModel):
-    raw_data_path: str
-    train_data_path: str
-    test_data_path: str
+    base_path: str = retreive_base_path()
+    raw_data_path: str = str(Path(base_path, f"artifacts/raw/raw_data.csv"))
 
     class ConfigDict:
         """pydantic forbidding extra parameters"""
@@ -17,14 +18,11 @@ class DataIngestionConfig(BaseModel):
 
 
 class DataIngestion(BaseModel):
-    config: DataIngestionConfig = DataIngestionConfig()
-    """raw , train , test data paths"""
+    ingestion_config: DataIngestionConfig = DataIngestionConfig()
+    """where to save data"""
 
     ingestion_type: Literal["csv", "db"] = "csv"
     """either choose to ingest data from a csv or from a supabase table"""
-
-    save_csv: bool = False
-    """whether to save the csv files or not"""
 
     data_path: Optional[str] = None
     """path of the csv file to ingest"""
@@ -53,7 +51,6 @@ class DataIngestion(BaseModel):
         return self
 
     @model_validator(mode="before")
-    @classmethod
     def validate_environement(cls, values: Dict) -> Dict:
         if values["ingestion_type"] == "db":
             values["supabase_key"] = get_from_dict_or_env(
@@ -65,18 +62,9 @@ class DataIngestion(BaseModel):
         return values
 
     def _read_from_db(self) -> tuple:
+        logging.info("Reading data from database")
         pass
 
-    def _split_data(self, df: pd.DataFrame) -> tuple:
-        logging.info("Splitting data into train and test")
-        train_data, test_data = train_test_split(df, test_size=0.2, random_state=42)
-
-        if self.save_csv:
-            logging.info("Saving train and test data")
-            train_data.to_csv(self.config.train_data_path, index=False)
-            test_data.to_csv(self.config.test_data_path, index=False)
-
-        return train_data, test_data
 
     def _read_from_csv(self) -> tuple:
         """read data from csv file and return train and test data
@@ -88,30 +76,26 @@ class DataIngestion(BaseModel):
         logging.info("Reading data from csv file")
         df = pd.read_csv(self.data_path)
 
-        train_data, test_data = self._split_data(df)
+        logging.info("Saving data to csv file")
+        df.to_csv(self.ingestion_config.raw_data_path, index=False)
 
-        return train_data, test_data
+        return self.ingestion_config.raw_data_path
 
-    def run_ingestion(self) -> Tuple:
+    def run_ingestion(self) -> str:
         try:
             logging.info("Starting data ingestion")
             if self.ingestion_type == "csv":
-                train_data, test_data = self._read_from_csv(self.data_path)
+                os.makedirs(
+                    os.path.dirname(self.ingestion_config.raw_data_path), exist_ok=True
+                )
+                raw_data_path = self._read_from_csv()
+                return raw_data_path
             else:
-                train_data, test_data = self._read_from_db()
+                df = self._read_from_db()
 
             logging.info("data ingestion completed")
+
 
         except Exception as e:
             logging.error(f"Error while ingesting data : {e}")
             raise e
-
-
-if __name__ == "__main__":
-    obj = DataIngestion(
-        ingestion_type="csv",
-        data_path="/home/redha/Documents/projects/NLP/sociolla/data/archive/products_all_brands.csv",
-        save_csv=True,
-    )
-
-    obj.run_ingestion()

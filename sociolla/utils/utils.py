@@ -1,8 +1,7 @@
 from pathlib import Path
 import os
 from typing import Any, Dict, Optional
-from src.machine_learning.utils.logger import logging
-
+from sociolla.utils.logger import logging
 
 def retreive_base_path():
     current_path = Path(__file__).resolve()
