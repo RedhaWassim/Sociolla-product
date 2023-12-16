@@ -1,12 +1,12 @@
 import pandas as pd
-from typing import Literal, Optional, List, Dict, Any, Tuple
+from typing import Literal, Optional, Dict
 from sociolla.utils.logger import logging
-from sklearn.model_selection import train_test_split
 from sociolla.utils.utils import get_from_dict_or_env, retreive_base_path
 from pathlib import Path
 from pydantic import BaseModel, model_validator
 import os
 from supabase import create_client, Client
+
 
 
 class DataIngestionConfig(BaseModel):
@@ -20,6 +20,8 @@ class DataIngestionConfig(BaseModel):
 
 
 class DataIngestion(BaseModel):
+
+
     ingestion_config: DataIngestionConfig = DataIngestionConfig()
     """where to save data"""
 
@@ -35,6 +37,9 @@ class DataIngestion(BaseModel):
 
     table_name: Optional[str] = None
     """table name in supabase database"""
+
+    to_csv: bool = True
+    """saving the ingested data from database or not"""
 
     class ConfigDict:
         """pydantic forbidding extra parameters"""
@@ -65,13 +70,17 @@ class DataIngestion(BaseModel):
 
     @property
     def supabase_client(self) -> Client:
-        return create_client(self.supabase_url, self.supabase_key)
+        return create_client(str(self.supabase_url), str(self.supabase_key))
 
     def _read_from_db(self) -> tuple:
         logging.info("Reading data from database")
         response = self.supabase_client.table(self.table_name).select("*").execute()
+        df = pd.DataFrame(response.data)
+        if self.to_csv:
+            logging.info("Saving data to csv file")
+            df.to_csv(self.ingestion_config.raw_data_path, index=False)
 
-        return response
+        return df
 
     def _read_from_csv(self) -> tuple:
         """read data from csv file and return train and test data
@@ -89,6 +98,7 @@ class DataIngestion(BaseModel):
         return self.ingestion_config.raw_data_path
 
     def run_ingestion(self) -> str:
+
         try:
             logging.info("Starting data ingestion")
             if self.ingestion_type == "csv":
@@ -100,10 +110,10 @@ class DataIngestion(BaseModel):
 
                 return raw_data_path
             else:
-                response = self._read_from_db()
+                df = self._read_from_db()
 
                 logging.info("data ingestion completed")
-                return response
+                return df
 
         except Exception as e:
             logging.error(f"Error while ingesting data : {e}")
