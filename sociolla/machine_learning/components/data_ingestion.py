@@ -97,9 +97,12 @@ class DataIngestion(BaseModel):
 
         return self.ingestion_config.raw_data_path
 
-    def run_ingestion(self) -> str:
+    def run_ingestion(self, table_name : Optional[str] = None) -> str:
 
         try:
+            if table_name is not None:
+                self.table_name = table_name
+                
             logging.info("Starting data ingestion")
             if self.ingestion_type == "csv":
                 os.makedirs(
