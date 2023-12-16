@@ -3,6 +3,7 @@ import os
 from typing import Any, Dict, Optional
 from sociolla.utils.logger import logging
 
+
 def retreive_base_path():
     current_path = Path(__file__).resolve()
     base_path = None
